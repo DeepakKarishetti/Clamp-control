@@ -1,0 +1,77 @@
+<launch>
+
+    <!--==========================-->
+    <!-- Arguments and Parameters -->
+    <!--==========================-->
+    <param name="/target_x" value="13"/>
+    <param name="/target_y" value="5"/>
+    <param name="/target_approach_angle" value="-0.78539816339"/>
+
+    <!-- Load Forklift Dimensions -->
+    <rosparam file="$(find setup_tf)/config/forklift.yaml" command="load"/>
+
+    <!--============================-->
+    <!-- Begin Turtlebot Simulation -->
+    <!--============================-->
+    <!--
+    <remap from="/odom" to="/gazebo/odom"/>
+    -->
+    <include file="$(find turtlebot_gazebo)/launch/turtlebot_world.launch">
+        <arg name="world_file" value="/opt/ros/kinetic/share/turtlebot_gazebo/worlds/empty.world"/>
+        <arg name="gui" value="false"/>
+    </include>
+    
+    <!--===================================-->
+    <!-- Obstacle Avoidance Path Generator -->
+    <!--===================================-->
+    <node pkg="robust_navigation" type="planner_node" name="planner_node" respawn="true">
+        <remap from="/path" to="/obstacle_avoidance_path"/>
+        <remap from="map" to="test_map_generator/map"/>
+    </node>
+    
+    <!--=========================-->
+    <!-- Maneuver Path Generator -->
+    <!--=========================-->
+    <node pkg="grasping" type="maneuver_path.py" name="maneuver_path">
+        <remap from="/maneuver_path/path1" to="/maneuver_path1"/>
+        <remap from="/maneuver_path/path2" to="/maneuver_path2"/>
+    </node>
+
+    <!--=========================-->
+    <!-- Approach Path Generator -->
+    <!--=========================-->
+    <node pkg="grasping" type="approach_path" name="approach_path">
+        <remap from="/approach_path/path" to="/approach_path"/>
+    </node>
+    
+    <!--======================-->
+    <!-- Velocity Controllers -->
+    <!--======================-->
+    <node pkg="robust_navigation" type="velocity_controller_forward" name="velocity_controller_forward" respawn="true"/>
+    <node pkg="robust_navigation" type="velocity_controller_reverse" name="velocity_controller_reverse" respawn="true"/>
+    <node pkg="sensors" type="velocity_conversion" name="velocity_conversion" output="screen">
+        <param name="use_covariance" value="false"/>
+        <remap from="/velocity_node/velocity" to="/controls/velocity_setpoint"/>
+        <remap from="/steering_node/filtered_angle" to="/controls/angle_setpoint"/>
+        <remap from="/velocity_conversion/twist" to="/mobile_base/commands/velocity"/>
+    </node>
+    
+    <!--==============-->
+    <!-- Path Handler -->
+    <!--==============-->
+    <node pkg="motion_testing" type="path_handler.py" name="path_handler" output="screen"/>
+    
+    <!--===================-->
+    <!-- Generate Test Map -->
+    <!--===================-->
+    <node pkg="motion_testing" type="test_map_generator.py" name="test_map_generator">
+        <remap from="/test_map_generator/target" to="/roll/pose" />
+    </node>
+    
+    <!--====================-->
+    <!-- Joystick Simulator -->
+    <!--====================-->
+    <!-- (sets the autonomous deadman button on) -->
+    <node pkg="motion_testing" type="joystick_simulation.py" name="joystick_simulation"/>
+
+</launch>

@@ -1,0 +1,29 @@
+<!-- Starts up all nodes for running a single camera -->
+<launch>
+    <!-- Prints output messages to screen for all nodes -->
+    <arg name="debug" default="false" />
+    <arg name="display_image" default="false" />
+    <arg name="depth_registration" default="false" />    
+    <arg name="camera" default="os1" />
+
+    <include file="$(find ouster_ros)/launch/os1.launch">
+        <arg name="respawn" value="true" />
+    </include>
+    <node pkg="tf"
+          type = "static_transform_publisher"
+          name = "camera_broadcaster"
+          args = "0.150 0.010 0.155 0 0 0 1 base_link os1 50" /> 
+    
+    <!-- Cylinder Detection Node -->
+    <node pkg="grasping" name="cylinder_detection" type="cylinder_detection" respawn="true" output="screen">
+    
+        <remap from="/os1/depth/points" to="/os1_node/points" />
+        <param name="debug" value="$(arg debug)" />
+        <param name="display_image" value="$(arg display_image)" />
+        <param name="camera" value="$(arg camera)" />
+        <param name="target_frame" value="base_link" />
+        <param name="target_x" value="0.0" />
+        <param name="target_y" value="1.0" />
+        <param name="pointcloud_frame" value="os1" />
+    </node>
+</launch>

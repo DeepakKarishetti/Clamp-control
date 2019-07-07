@@ -1,0 +1,19 @@
+<launch>
+
+    <param name="/target_x" value="13" />
+    <param name="/target_y" value="5" />
+    <param name="/target_approach_angle" value="-0.78539816339" />
+
+    <node pkg="grasping" type="maneuver_path.py" name="maneuver_path" output="screen">
+        <remap from="/map" to="test_map_generator/map" />
+    </node>
+
+    <node pkg="motion_testing" type="test_map_generator.py" name="test_map_generator">
+        <remap from="/test_map_generator/target" to="/roll/pose" />
+    </node>
+    
+    <node pkg="grasping" type="approach_path" name="approach_path" output="screen"/>
+    
+    <node pkg="motion_testing" type="path_handler.py" name="path_handler" output="screen" />
+
+</launch>

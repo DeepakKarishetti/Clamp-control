@@ -1,0 +1,15 @@
+<launch>
+
+    <!-- Start publishing transforms -->
+    <include file="$(find setup_tf)/launch/setup_tf_simulation.launch"/>
+
+    <!-- Start velocity controller -->
+    <node pkg="robust_navigation" type="velocity_controller_reverse" name="velocity_controller_reverse" output="screen"/>
+    
+    <!-- Start path generator -->
+    <node pkg="grasping" type="bspline_path" name="bspline_path" output="screen"/>
+    
+    <!-- Send test data points to path generator -->
+    <node pkg="grasping" type="test_points" name="test_points" output="screen"/>
+
+</launch>
