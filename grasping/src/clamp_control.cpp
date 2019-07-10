@@ -18,44 +18,40 @@ private:
 	ros::Subscriber limit_switch_close_sub;
 	ros::Subscriber force_sub;
 	ros::Subscriber stretch_sub;
-	ros::Subscriber clamp_switch_sub;
 
         ros::Publisher clamp_movement_pub;
         ros::Publisher clamp_grasp_pub;
 	
-	int clamp_switch;
 	bool limit_up;
 	bool limit_down;
 	bool limit_open;
 	bool limit_close;
 	int force;
 	float stretch;
+	int controller_value;
+	
 
 public:
 	ClampControl() : nh(""), nh_("~")
 	{
-		clamp_control_sub = nh.subscribe<std_msgs::Float32> ("control", 1, &ClampControl::control_Callback, this);
-
-		// main controller to be subscribed to	
-
-		clamp_switch_sub = nh.subscribe<std_msgs::Int16> ("clamp_switch", 1, &ClampControl::switch_Callback, this);	
+		// to be subscribed to the controller for operation
+		clamp_control_sub = nh.subscribe<std_msgs::Int16> ("controller", 1, &ClampControl::clamp_Callback, this);
 	
-		limit_switch_up_sub = nh.subscribe<std_msgs::Bool> ("limit_switch_up", 1, &ClampControl::limit_up_Callback, this);
-		limit_switch_down_sub = nh.subscribe<std_msgs::Bool> ("limit_switch_down", 1, &ClampControl::limit_down_Callback, this);
-		limit_switch_open_sub = nh.subscribe<std_msgs::Bool> ("limit_switch_open", 1, &ClampControl::limit_open_Callback, this);
-		limit_switch_close_sub = nh.subscribe<std_msgs::Bool> ("limit_switch_close", 1, &ClampControl::limit_close_Callback, this);
-		force_sub = nh.subscribe<std_msgs::Int16> ("force", 1, &ClampControl::force_Callback, this);
-		stretch_sub = nh.subscribe<std_msgs::Float32> ("stretch", 1, &ClampControl::stretch_Callback, this);
+		limit_switch_up_sub = nh.subscribe<std_msgs::Bool> ("clamp_control/limit_switch_up", 1, &ClampControl::limit_up_Callback, this);
+		limit_switch_down_sub = nh.subscribe<std_msgs::Bool> ("clamp_control/limit_switch_down", 1, &ClampControl::limit_down_Callback, this);
+		limit_switch_open_sub = nh.subscribe<std_msgs::Bool> ("clamp_control/limit_switch_open", 1, &ClampControl::limit_open_Callback, this);
+		limit_switch_close_sub = nh.subscribe<std_msgs::Bool> ("clamp_control/limit_switch_close", 1, &ClampControl::limit_close_Callback, this);
+		force_sub = nh.subscribe<std_msgs::Int16> ("clamp_control/force", 1, &ClampControl::force_Callback, this);
+		stretch_sub = nh.subscribe<std_msgs::Float32> ("clamp_control/stretch", 1, &ClampControl::stretch_Callback, this);
 		
                 clamp_movement_pub = nh_.advertise<std_msgs::Float32>("clamp_movement", 1);
                 clamp_grasp_pub = nh_.advertise<std_msgs::Float32>("clamp_grasp", 1);
+		
+
 	}
 
-
-	void switch_Callback(const std_msgs::Int16::ConstPtr& msg)
-	{
-	 	clamp_switch = msg -> data;
-	}	
+	
+	void controller();	
 
 	void limit_up_Callback(const std_msgs::Bool::ConstPtr& msg)
 	{
@@ -87,77 +83,112 @@ public:
 		stretch = msg -> data;
 	}
 
-	void control_Callback(const std_msgs::Float32::ConstPtr& msg)
-	{
-		std_msgs::Float32 clamp_movement;
-		std_msgs::Float32 clamp_grasp;
+	void clamp_Callback(const std_msgs::Int16::ConstPtr& msg)
+	{	
+		controller_value = msg -> data;
+	}	
+};
+
+
+void ClampControl::controller()
+{
+	float clamp_movement;
+	float clamp_grasp;
+
+	bool clamp_opening;
+	bool clamp_closing;
+	bool clamp_raising;
+	bool clamp_lowering;
+	bool clamp_plate;
+	bool force_range;
 	
-		// Picking operation
-		if (clamp_switch == 7)
+	if (limit_open == false)
+	{
+		clamp_opening = true;
+	}
+
+	else if (limit_close == false)
+	{
+		clamp_closing = true;
+	}
+
+	else if (limit_down == false)
+	{
+		clamp_lowering = true;
+	}
+
+	else if (limit_up == false)
+	{
+		clamp_raising = true;
+	}
+
+        else if (stretch > 18.0 && stretch < 22.0)
+	{
+		clamp_plate == true;
+	}
+
+	else if (force < 970)
+	{
+		force_range == true;
+	}
+
+	// Picking operation
+	if (controller_value == 7)
+	{
+		// lower the clamp && limit switch, check for stretch sensor, start grasp, check for fsr && limit switch, lift clamp
+		if (clamp_opening == true)
 		{
-			// lower the clamp && limit switch, check for stretch sensor, start grasp, check for fsr && limit switch, lift clamp
-			while (limit_open == false)
-			{
-				clamp_grasp.data = 0.5;
-				clamp_grasp_pub.publish(clamp_grasp); 	
-			}
-
-			while (limit_down == false)
-			{
-				clamp_movement.data = -0.5;
-				clamp_movement_pub.publish(clamp_movement);
-			}
-
-			while (stretch > 18.0 && stretch < 22.0)
-			{
-				if ((limit_close == false) && force < 950)
-				{
-					clamp_grasp.data = -0.5;
-					clamp_grasp_pub.publish(clamp_grasp);
-				}
-				else
-				{
-					while (limit_up == false)
-					{
-						clamp_movement.data = 0.5;
-						clamp_movement_pub.publish(clamp_movement);
-					}
-				}
-				
-			}
+			clamp_grasp = 0.5;
 		}
 
-		// Placing operation
-		else if (clamp_switch == 8)
+		if (clamp_lowering == true)
 		{
-			// lower the clamp && limit switch, open clamp && limit switch, once moved away, lift clamp && limit switch
-			while (limit_down == false)
+			clamp_movement = -0.5;
+		}
+
+		if (clamp_plate == true)
+		{
+			if ((clamp_closing == true) && force_range)
 			{
-				clamp_movement.data = -0.5;
-				clamp_movement_pub.publish(clamp_movement);
-			}
-			
-			if (limit_open == false)
-			{
-				clamp_grasp.data = 0.5;
-				clamp_grasp_pub.publish(clamp_grasp);
+				clamp_grasp = -0.5;
 			}
 			else
 			{
-				clamp_movement.data = 0.5;
-				clamp_movement_pub.publish(clamp_movement);
+				if (clamp_raising == true)
+				{	
+					clamp_movement = 0.5;
+				}
 			}
-		}
-
-		else
-		{
-			clamp_movement.data = 0.0;
-			clamp_movement_pub.publish(clamp_movement);
-			clamp_grasp.data = 0.0;
-			clamp_grasp_pub.publish(clamp_grasp);
+			
 		}
 	}
-};
+
+	// Placing operation
+	else if (controller_value == 8)
+	{
+		// lower the clamp && limit switch, open clamp && limit switch, once moved away, lift clamp && limit switch
+		if (clamp_lowering == true)
+		{
+			clamp_movement = -0.5;
+		}
+		
+		if (clamp_opening == true) // open clamp
+		{
+			clamp_grasp = 0.5;
+		}
+		else
+		{
+			clamp_movement = 0.5;
+		}
+	}
+
+	else
+	{
+		clamp_movement = 0.0;
+		clamp_grasp = 0.0;
+	}
+}
+
 
 int main(int argc, char **argv)
 {
@@ -168,11 +199,9 @@ int main(int argc, char **argv)
 	ros::Rate rate(3);
 	while (ros::ok())
 	{
-		//	
-
-
-		rate.sleep();
+		clamp_control.controller();
 		ros::spinOnce;
+		rate.sleep();
 	}
 	return 0;
 }
