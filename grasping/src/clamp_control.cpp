@@ -29,8 +29,10 @@ private:
 	int force;
 	float stretch;
 	int controller_value;
-	
 
+	float clamp_grasp;
+	float clamp_movement;
+	
 public:
 	ClampControl() : nh(""), nh_("~")
 	{
@@ -52,6 +54,11 @@ public:
 
 	
 	void controller();	
+	float open_clamp();
+	float lower_clamp();
+	float raise_clamp();
+	float close_clamp();
+	float grasp();
 
 	void limit_up_Callback(const std_msgs::Bool::ConstPtr& msg)
 	{
@@ -85,122 +92,134 @@ public:
 
 	void clamp_Callback(const std_msgs::Int16::ConstPtr& msg)
 	{
-		std_msgs::Float32 clamp_movement;
-		std_msgs::Float32 clamp_grasp;		
-	
-		clamp_movement_pub.publish(std_msgs::Float32(clamp_movement));
-		clamp_grasp_pub.publish(std_msgs::Float32(clamp_grasp));
-		controller_value = msg -> data;
+			controller_value = msg -> data;
 	}	
 };
+
+float ClampControl::open_clamp()
+{
+	if (limit_open == false)
+	{
+		clamp_grasp = 0.5;
+		//ros::spinOnce();
+	}
+	else
+	{
+		clamp_grasp = 0.0;
+	}
+	return clamp_grasp;
+}
+
+float ClampControl::lower_clamp()
+{
+	if (limit_down == false)
+	{
+		clamp_movement = -0.5;
+		//ros::spinOnce();
+	}
+	else
+	{
+		clamp_movement = 0.0;
+	}
+
+	return clamp_movement;
+}
+
+float ClampControl::grasp()
+{
+	if (stretch > 18.0 && stretch < 22.0)
+	{
+		if ((limit_close == false) && force < 962)
+		{
+			clamp_grasp = -0.5;
+			//ros::spinOnce();
+		}
+		else
+		{
+			clamp_grasp = 0.0;
+		}
+	}
+	else
+	{
+		clamp_grasp = 0.0;
+	}
+
+	return clamp_grasp;
+}
+
+float ClampControl::raise_clamp()
+{
+	if (limit_up == false)
+	{
+		clamp_movement = 0.5;
+		//ros::spinOnce();
+	}
+	else
+	{
+		clamp_movement = 0.0;
+	}
+
+	return clamp_movement;
+}
+
+float ClampControl::close_clamp()
+{
+	if (limit_close == false)
+	{
+		clamp_grasp == -0.5;
+		//ros::spinOnce();
+	}
+	else
+	{
+		clamp_grasp = 0.0;
+	}
+	
+	return clamp_grasp;
+} 
 
 
 void ClampControl::controller()
 {
-	float clamp_movement;
-	float clamp_grasp;
 
-	bool clamp_opening;
-	bool clamp_closing;
-	bool clamp_raising;
-	bool clamp_lowering;
-	bool clamp_plate;
-	bool force_range;
-	
-
-	if (limit_open == false)
-	{
-		clamp_opening = true;
-	}
-
-	else if (limit_close == false)
-	{
-		clamp_closing = true;
-	}
-
-	else if (limit_down == false)
-	{
-		clamp_lowering = true;
-	}
-
-	else if (limit_up == false)
-	{
-		clamp_raising = true;
-	}
-
-        else if (stretch > 18.0 && stretch < 22.0)
-	{
-		clamp_plate == true;
-	}
-
-	else if (force < 970)
-	{
-		force_range == true;
-	}
-	
-
-	// Picking operation
 	if (controller_value == 7)
 	{
-		// lower the clamp && limit switch, check for stretch sensor, start grasp, check for fsr && limit switch, lift clamp
-		if (clamp_opening == true)
-		//while (limit_open == false)
-		{
-			clamp_grasp = 0.5;
-		}
-
-		if (clamp_lowering == true)
-		//while (limit_down == false)
-		{
-			clamp_movement = -0.5;
-		}
-
-		//if (stretch > 18.0 && stretch < 22.0)
-		if (clamp_plate == true)
-		{
-			if ((clamp_closing == true) && force_range)
-			//if ((limit_close == false) && force <970)
+		if (open_clamp())
+		{	
+			if (lower_clamp())
 			{
-				clamp_grasp = -0.5;
-			}
-			else
-			{
-				if (clamp_raising == true)
-				//while (limit_up == false)
-				{	
-					clamp_movement = 0.5;
+				if (grasp())
+				{
+					raise_clamp();
 				}
 			}
-			
 		}
 	}
-
-	// Placing operation
+	
 	else if (controller_value == 8)
 	{
-		// lower the clamp && limit switch, open clamp && limit switch, once moved away, lift clamp && limit switch
-		if (clamp_lowering == true)
-		//while (limit_down == false)
+		if (lower_clamp())
 		{
-			clamp_movement = -0.5;
-		}
-		
-		if (clamp_opening == true) // open clamp
-		//if (limit_open == false)
-		{
-			clamp_grasp = 0.5;
-		}
-		else
-		{
-			clamp_movement = 0.5;
+			if (open_clamp())
+			{
+				raise_clamp();
+			}
 		}
 	}
 
 	else
-	{
-		clamp_movement = 0.0;
+	{	
 		clamp_grasp = 0.0;
+		clamp_movement = 0.0;
 	}
+		
+	std_msgs::Float32 clamp_movement_msg;
+	std_msgs::Float32 clamp_grasp_msg;		
+
+	clamp_movement_msg.data = clamp_movement;
+	clamp_grasp_msg.data = clamp_grasp;
+
+	clamp_movement_pub.publish(clamp_movement_msg);
+	clamp_grasp_pub.publish(clamp_grasp_msg);	
 }
 
 
@@ -216,6 +235,8 @@ int main(int argc, char **argv)
 		clamp_control.controller();
 		ros::spinOnce();
 		rate.sleep();
+		//ros::MultiThreadedSpinner spinner(4);
+		//spinner.spin();
 	}
 	return 0;
 }
