@@ -1,4 +1,6 @@
-Autonomous Clamp control involves the use of the following:
+## Autonomous forklift clamp control module
+
+**Autonomous Clamp control involves the use of the following:**
 
  - Simulated clamp-forklift switches
  - Limit switches
